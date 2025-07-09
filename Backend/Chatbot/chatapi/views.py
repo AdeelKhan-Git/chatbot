@@ -59,49 +59,55 @@ class UploadFileView(APIView):
             return Response({'error':'provided file is not json format'},status=status.HTTP_400_BAD_REQUEST)
 
 
-        inserted_count = 0
-        skipped_count = 0
+       
       
+        try:
+            inserted_count = 0
+            skipped_count = 0
+            for item in data:
 
-        for item in data:
+                question = item.get('question','').strip()
+                answer =item.get('answer','').strip()
+                
+                if not question and not answer:
+                    continue
+                
+                
+                exists = KnowledgeBase.objects.filter(
+                    question__iexact=question,
+                    answer__iexact = answer
+                    ).exists()
+                
+        
+                if not exists:
+                    KnowledgeBase.objects.create(question=question, answer=answer)
+                    inserted_count += 1
+                else:
+                    skipped_count += 1
 
-            question = item.get('question','').strip()
-            answer =item.get('answer','').strip()
-            
-            if not question and not answer:
-                continue
-             
-            
-            exists = KnowledgeBase.objects.filter(
-                question__iexact=question,
-                answer__iexact = answer
-                ).exists()
-            
-    
-            if not exists:
-                KnowledgeBase.objects.create(question=question, answer=answer)
-                inserted_count += 1
-            else:
-                skipped_count += 1
+            UploadRecord.objects.create(
+                    file_name=file.name,
+                    uploaded_by=request.user,
+                    inserted=inserted_count,
+                    skipped=skipped_count
+                )
 
-        UploadRecord.objects.create(
-                file_name=file.name,
-                uploaded_by=request.user,
-                inserted=inserted_count,
-                skipped=skipped_count
-            )
+            if inserted_count:
+                sync_new_entries_to_vector_store()
+                print("vector db recreated")
+                
 
-        if inserted_count:
-            sync_new_entries_to_vector_store()
-
-        return Response({'message':"Data upload successfully and vector store rebuilt successfully",
-                         "inserted":inserted_count,
-                         "skipped":skipped_count},
-                         status=status.HTTP_200_OK)
+            return Response({'message':"Data upload successfully and vector store rebuilt successfully",
+                            "inserted":inserted_count,
+                            "skipped":skipped_count},
+                            status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error':str(e)},status=status.HTTP_400_BAD_REQUEST)
                     
 
 
 class UploadedDataListView(APIView):
+    permission_classes = [permissions.IsAdminUser]
     def get(self, request):
         
         records = UploadRecord.objects.all().order_by('-uploaded_at')

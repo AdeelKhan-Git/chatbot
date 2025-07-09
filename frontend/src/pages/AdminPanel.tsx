@@ -19,6 +19,8 @@ import {
 } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
+import logo from "../assets/images/logo.png";
+import api from "../lib/api"
 
 interface FileRecord {
   file_name: string;
@@ -45,28 +47,14 @@ const AdminPanel = () => {
 
   if (!token) return
 
-  useEffect(() => {
-    const fetchHistory = async () => {
-
-      try {
-        const res = await fetch("http://127.0.0.1:8000/api/file_records", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
-
-        if (!res.ok) throw new Error("Failed to fetch history");
-
-        const data = await res.json();
-        setUploadedFiles(data?.message);
-      } catch (error) {
-        console.error(error);
-        toast.error("Failed to load upload history");
-      }
-    };
-
-    fetchHistory();
-  }, [token]);
+  const fetchHistory = async () => {
+    try {
+      const res = await api.get("/file_records");
+      setUploadedFiles(res.data?.message);
+    } catch (error) {
+      toast.error("Failed to load upload history");
+    }
+  };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -92,24 +80,8 @@ const AdminPanel = () => {
     const formData = new FormData();
     formData.append("file", selectedFile);
 
-    const accessToken = localStorage.getItem("accessToken");
-
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/upload_file/", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-        body: formData,
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        const errorMsg = data?.error || data?.message || "Upload failed.";
-        toast.error(errorMsg); 
-        return
-      };
+      await api.post("/upload_file/", formData);
 
       toast.success("Uploaded successfully");
 
@@ -120,23 +92,14 @@ const AdminPanel = () => {
       }
 
       // Refresh file history
-      const refreshed = await fetch("http://127.0.0.1:8000/api/file_records", {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
-      });
-
-      const updated = await refreshed.json();
-      setUploadedFiles(updated.message);
+      const refreshed = await api.get("/file_records");
+      setUploadedFiles(refreshed.data.message);
     } catch (error) {
+      const msg = error.response?.data?.message || "Upload failed.";
+      toast.error(msg);
       console.error("Upload error:", error);
     } finally {
       setUploading(false);
-      // Reset form
-      setSelectedFile(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
     }
   };
 
@@ -149,6 +112,10 @@ const AdminPanel = () => {
       navigate("/admin-login");
     }, 500);
   };
+
+  useEffect(() => {
+    fetchHistory();
+  }, [token]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
@@ -164,7 +131,7 @@ const AdminPanel = () => {
                 </Link>
               </Button> */}
               <div className="flex items-center gap-4">
-                <img src="/public/images/logo.png" alt="KU_LOGO" className="w-14" />
+                <img src={logo} alt="KU_LOGO" className="w-14" />
                 <div><h1 className="text-2xl font-bold text-black bg-clip-text text-transparent">
                   Admin Panel
                 </h1>

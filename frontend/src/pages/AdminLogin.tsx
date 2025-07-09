@@ -1,4 +1,7 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import toast from "react-hot-toast";
+import { Shield, Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -9,18 +12,17 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Shield, Eye, EyeOff } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
+import logo from "../assets/images/logo.png"
+import api from "@/lib/api";
 
 const AdminLogin = () => {
-  const [username, setUsername] = useState(""); // changed from email
+  const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+
   const navigate = useNavigate();
 
-  // Redirect if already logged in
   useEffect(() => {
     const token = localStorage.getItem("accessToken");
     if (token) {
@@ -33,30 +35,22 @@ const AdminLogin = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch("http://127.0.0.1:8000/api/login/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ username, password }),
+      const response = await api.post("/login/", {
+        username,
+        password,
       });
 
-      if (!response.ok) {
-        throw new Error("Invalid credentials");
-      }
+      const data = response.data;
 
-      const data = await response.json();
-
-      // Store tokens and user info in localStorage
       localStorage.setItem("accessToken", data.token.access);
       localStorage.setItem("refreshToken", data.token.refresh);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      // Redirect to /admin
       navigate("/admin");
-    } catch (error) {
-      toast.error("Login failed. Please check your credentials.")
-      console.error(error);
+    } catch (error: any) {
+      toast.error(
+        error.response?.data?.message || "Login failed. Please check credentials."
+      );
     } finally {
       setIsLoading(false);
     }
@@ -67,10 +61,7 @@ const AdminLogin = () => {
       <div className="w-full max-w-md px-4">
         <Card className="shadow-xl">
           <CardHeader className="text-center">
-            {/* <div className="mx-auto mb-4 p-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full w-fit">
-              <Shield className="h-8 w-8 text-white" />
-            </div> */}
-            <img src="/public/images/logo.png" className="w-16 mx-auto" alt="KU-logo" />
+            <img src={logo} className="w-16 mx-auto" alt="KU-logo" />
             <CardTitle className="text-2xl font-bold">Admin Login</CardTitle>
             <CardDescription>
               Sign in to access the admin panel
@@ -126,7 +117,7 @@ const AdminLogin = () => {
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
-{/* 
+            {/* 
             <div className="mt-6 p-4 bg-blue-50 rounded-lg">
               <p className="text-sm text-blue-800 font-medium">Demo Credentials:</p>
               <p className="text-sm text-blue-700">Username: khan</p>

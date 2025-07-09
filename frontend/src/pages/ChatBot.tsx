@@ -3,9 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+// import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Bot, User, Send, ArrowLeft, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import logo from "../assets/images/logo.png"
 
 interface Message {
   id: number;
@@ -106,7 +107,7 @@ const ChatBot = () => {
         setMessages(prev => [...prev, errorResponse]);
         setIsTyping(false);
       }, 500);
-    } finally{
+    } finally {
       setIsTyping(true);
     }
   };
@@ -131,7 +132,7 @@ const ChatBot = () => {
                 </Link> */}
               </Button>
               <div className="flex justify-center items-center space-x-3">
-                <img src="/public/images/logo.png" className="w-[50px] h-full" />
+                <img src={logo} className="w-[50px] h-full" />
                 {/* <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full">
                   <Bot className="h-6 w-6 text-white" />
                 </div> */}
@@ -172,12 +173,7 @@ const ChatBot = () => {
                   }`}
               >
                 {message.sender === 'bot' && (
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-blue-100">
-                      <img src="/public/images/logo.png" className="size-4" />
-                      {/* <Bot className="h-4 w-4 text-blue-600" /> */}
-                    </AvatarFallback>
-                  </Avatar>
+                  <img src={logo} className="size-4" />
                 )}
 
                 <div
@@ -193,11 +189,9 @@ const ChatBot = () => {
                 </div>
 
                 {message.sender === 'user' && (
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-gray-100">
-                      <User className="h-4 w-4" />
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="h-8 w-8 bg-gray-100">
+                    <User className="h-4 w-4" />
+                  </div>
                 )}
               </div>
             ))}
@@ -206,12 +200,10 @@ const ChatBot = () => {
             {isTyping && (
               <>
                 <div className="flex items-start space-x-3">
-                  <Avatar className="h-8 w-8">
-                    <AvatarFallback className="bg-blue-100">
-                      <img src="/public/images/logo.png" className="size-4" />
-                      {/* <Bot className="h-4 w-4 text-blue-600" /> */}
-                    </AvatarFallback>
-                  </Avatar>
+                  <div className="h-8 w-8 bg-blue-100">
+                    <img src={logo} className="size-4" />
+                  </div>
+
                   <div className="bg-gray-100 p-3 rounded-lg">
                     <div className="flex space-x-1">
                       <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>

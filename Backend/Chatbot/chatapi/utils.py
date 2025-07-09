@@ -8,6 +8,10 @@ from langchain_core.documents import Document
 from langchain_ollama.llms import OllamaLLM
 from langchain_core.prompts import ChatPromptTemplate
 from chatapi.models import KnowledgeBase
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 CHROMA_DB_DIR = "./chroma_langchain_db"
 COLLECTION_NAME = "knowledgebase_qna"
@@ -55,6 +59,7 @@ def sync_new_entries_to_vector_store():
         # Handle empty vector store case
         try:
             existing_ids = set(vector_store.get()['ids'])
+            logger.info(f"[VECTOR SYNC] Existing IDs: {existing_ids}")
         except:
             existing_ids = set()
         
@@ -66,20 +71,24 @@ def sync_new_entries_to_vector_store():
             entry_id = str(entry.id)
             if entry_id not in existing_ids:
                 new_docs.append(Document(
-                    page_content=f"{entry.question} {entry.answer}",
-                    metadata={"source": "kb"},
+                    page_content=entry.question,
+                    metadata={"source": "kb",
+                              "answer":entry.answer,
+                              "id":entry_id},
                     id=entry_id
                 ))
                 new_ids.append(entry_id)
         
         if new_docs:
+            logger.info(f"[VECTOR SYNC] Adding {len(new_docs)} new documents to vector store")
             vector_store.add_documents(documents=new_docs, ids=new_ids)
-        
+        else:
+            logger.info("[VECTOR SYNC] No new documents to add")
         vector_store_initialized = True
         return True
     
     except Exception as e:
-        print(f"[VECTOR SYNC ERROR] {str(e)}")
+        logger.warning(f"[VECTOR SYNC ERROR] {str(e)}")
         return False
 
 def initialize_vector_store():
@@ -91,7 +100,7 @@ def initialize_vector_store():
                 sync_new_entries_to_vector_store()
 
 def chatbot_response(question):
-    print("[START] Processing prompt:", question)
+    logger.info(f"[START] Processing prompt: {question}")
     try:
         # Ensure vector store is initialized
         initialize_vector_store()
@@ -102,32 +111,48 @@ def chatbot_response(question):
         docs_with_scores = vector_store.similarity_search_with_score(question, k=10)
         retrieval_time = time.time() - start_time
         
+        logger.info(f"[RETRIEVER] Took {retrieval_time:.2f} seconds, found {len(docs_with_scores)} docs")
         # Filter documents
-        filtered_docs = []
+        
+        for i, (doc, score) in enumerate(docs_with_scores):
+            similarity = 1.0 - score
+            logger.info(f"  Candidate {i+1}: similarity={similarity:.2f}, content={doc.page_content[:50]}...")
+        
+        
+        best_match = None
+        best_similarity = 0
         for doc, score in docs_with_scores:
             similarity = 1.0 - score
-            if similarity >= 0.3:
-                filtered_docs.append(doc)
-        
-        print(f"[RETRIEVER] Took {retrieval_time:.2f} seconds, found {len(filtered_docs)} docs")
-        
-        # Handle no docs case
-        if not filtered_docs:
+            if similarity > best_similarity:
+                best_match = doc
+                best_similarity = similarity
+
+       # Handle no suitable docs case
+        if not best_match or best_similarity < 0.5:
+            logger.info(f"[RETRIEVER] No good match found (best similarity: {best_similarity:.2f})")
             return "I don't have information about that topic in my knowledge base."
         
-        # Truncate context to 2000 characters
-        context = "\n\n".join(doc.page_content for doc in filtered_docs)
+        logger.info(f"[RETRIEVER] Best match similarity: {best_similarity:.2f}")
+        
+        if best_similarity >= 0.85:  # High confidence match
+            logger.info("[RETRIEVER] Using direct answer from knowledge base")
+            return best_match.metadata["answer"]
+        
+        logger.info("[RETRIEVER] Using LLM generation with context")
+        context = best_match.page_content
+        if "answer" in best_match.metadata:
+            context += f"\nAnswer: {best_match.metadata['answer']}"
   
         
         # Generate response
         start_gen = time.time()
         result = chain.invoke({"context": context, "question": question})
         generation_time = time.time() - start_gen
-        print(f"[GENERATION] Took {generation_time:.2f} seconds")
+        logger.info(f"[GENERATION] Took {generation_time:.2f} seconds")
         
             
         return result
         
     except Exception as e:
-        print(f"[ERROR] {str(e)}")
+        logger.info(f"[ERROR] {str(e)}")
         return "I encountered an error processing your request."

@@ -1,0 +1,43 @@
+name: uok_chatbot
+
+services:
+    backend:
+      build:
+        context: ./Backend/Chatbot
+        dockerfile: Dockerfile
+      command: python manage.py runserver 0.0.0.0:8000 
+
+      volumes:
+        - ./Backend/Chatbot:/Chatbot
+      ports:
+        - "8000:8000"
+      environment:
+        - DJANGO_SETTINGS_MODULE=Chatbot.settings
+        - DEBUG=True
+
+        - OLLAMA_BASE_URL=http://ollama:11434
+
+      depends_on:
+        - ollama  
+
+    frontend:
+      build:
+        context: ./frontend
+        dockerfile: Dockerfile
+      ports:
+        - "8080:8080"
+      volumes:
+        - ./frontend:/frontend/src
+      depends_on:
+        - backend
+
+      # 3. NEW OLLAMA SERVICE (the AI brain)
+    ollama:
+      image: ollama/ollama       # Use official Ollama image
+      ports:
+        - "11434:11434"          # Expose Ollama's port
+      volumes:
+        - ollama_data:/root/.ollama
+
+volumes:
+  ollama_data:   
