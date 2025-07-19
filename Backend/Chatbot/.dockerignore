@@ -7,3 +7,4 @@ Dockerfile
 *.log
 *.sqlite3
 *.md
+chroma_langchain_db/

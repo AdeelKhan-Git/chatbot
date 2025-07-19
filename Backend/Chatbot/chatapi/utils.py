@@ -102,17 +102,16 @@ def initialize_vector_store():
 def chatbot_response(question):
     logger.info(f"[START] Processing prompt: {question}")
     try:
-        # Ensure vector store is initialized
+        
         initialize_vector_store()
         
         start_time = time.time()
         
-        # Use synchronous search method
         docs_with_scores = vector_store.similarity_search_with_score(question, k=10)
         retrieval_time = time.time() - start_time
         
         logger.info(f"[RETRIEVER] Took {retrieval_time:.2f} seconds, found {len(docs_with_scores)} docs")
-        # Filter documents
+        
         
         for i, (doc, score) in enumerate(docs_with_scores):
             similarity = 1.0 - score
@@ -127,14 +126,14 @@ def chatbot_response(question):
                 best_match = doc
                 best_similarity = similarity
 
-       # Handle no suitable docs case
+      
         if not best_match or best_similarity < 0.5:
             logger.info(f"[RETRIEVER] No good match found (best similarity: {best_similarity:.2f})")
             return "I don't have information about that topic in my knowledge base."
         
         logger.info(f"[RETRIEVER] Best match similarity: {best_similarity:.2f}")
         
-        if best_similarity >= 0.85:  # High confidence match
+        if best_similarity >= 0.85: 
             logger.info("[RETRIEVER] Using direct answer from knowledge base")
             return best_match.metadata["answer"]
         

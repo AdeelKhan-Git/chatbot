@@ -4,7 +4,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     OLLAMA_HOST=http://ollama:11434 \
     DJANGO_SETTINGS_MODULE=Chatbot.settings
-ENV OLLAMA_BASE_URL=http://host.docker.internal:11434
+
 # Install dependencies
 RUN apt-get update && apt-get install -y gcc libffi-dev libssl-dev && rm -rf /var/lib/apt/lists/*
 
