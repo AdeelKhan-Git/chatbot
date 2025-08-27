@@ -1,5 +1,5 @@
 from django.db import models
-from django.contrib.auth.models import User
+from user.models import User
 # Create your models here.
 
 class KnowledgeBase(models.Model):
@@ -18,3 +18,12 @@ class UploadRecord(models.Model):
     def __str__(self):
 
         return f'{self.file_name} - {self.uploaded_by} - {self.uploaded_at}'
+    
+class ChatMessage(models.Model):
+    ROLE_CHOICES = [('user','User'),('assistant','Assistant')]
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_messages')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+    content = models.TextField()
+    timestemp = models.DateTimeField(auto_now_add=True)
+    

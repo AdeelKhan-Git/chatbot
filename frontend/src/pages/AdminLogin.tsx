@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
-import { Shield, Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import logo from "../assets/images/logo.png"
+import logo from "../assets/images/logo.png";
 import api from "@/lib/api";
 
 const AdminLogin = () => {
@@ -35,8 +35,8 @@ const AdminLogin = () => {
     setIsLoading(true);
 
     try {
-      const response = await api.post("/login/", {
-        username,
+      const response = await api.post("user/login/", {
+        email: username,
         password,
       });
 
@@ -49,11 +49,16 @@ const AdminLogin = () => {
       navigate("/admin");
     } catch (error: any) {
       toast.error(
-        error.response?.data?.message || "Login failed. Please check credentials."
+        error.response?.data?.message ||
+          "Login failed. Please check credentials."
       );
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Handle Google login
+  const handleGoogleLogin = () => {
   };
 
   return (
@@ -117,12 +122,17 @@ const AdminLogin = () => {
                 {isLoading ? "Signing in..." : "Sign In"}
               </Button>
             </form>
-            {/* 
-            <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-              <p className="text-sm text-blue-800 font-medium">Demo Credentials:</p>
-              <p className="text-sm text-blue-700">Username: khan</p>
-              <p className="text-sm text-blue-700">Password: 123</p>
-            </div> */}
+
+            {/* Google login button */}
+            <div className="mt-4">
+              <Button
+                type="button"
+                onClick={handleGoogleLogin}
+                className="w-full bg-red-500 hover:bg-red-600 text-white"
+              >
+                Sign in with Google
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

@@ -1,5 +1,5 @@
 
-import time
+import time,re
 import threading
 from django.db import connections
 from .embedding import embeddings
@@ -7,8 +7,11 @@ from langchain_chroma import Chroma
 from langchain_core.documents import Document
 from langchain_ollama.llms import OllamaLLM
 from langchain_core.prompts import ChatPromptTemplate
-from chatapi.models import KnowledgeBase
+from chatapi.models import KnowledgeBase,ChatMessage
 import logging
+from langchain.memory import ConversationBufferMemory
+from langchain.schema import HumanMessage, AIMessage
+
 
 
 logger = logging.getLogger(__name__)
@@ -99,59 +102,106 @@ def initialize_vector_store():
             if not vector_store_initialized:
                 sync_new_entries_to_vector_store()
 
-def chatbot_response(question):
+def get_user_memory(user):
+    memory = ConversationBufferMemory(
+        memory_key= 'chat_history',
+        return_messages = True
+    )
+    
+    
+    messages = ChatMessage.objects.filter(user=user).order_by('timestemp')
+
+    for msg in messages:
+        if msg.role =='user':
+            memory.chat_memory.add_user_message(msg.content)
+        else:
+            memory.chat_memory.add_ai_message(msg.content)
+
+    return memory
+
+
+def chatbot_response(user,question):
     logger.info(f"[START] Processing prompt: {question}")
     try:
         
         initialize_vector_store()
         
-        start_time = time.time()
+        memory = get_user_memory(user)
+        chat_history = memory.load_memory_variables({})['chat_history']
+
         
-        docs_with_scores = vector_store.similarity_search_with_score(question, k=10)
-        retrieval_time = time.time() - start_time
-        
-        logger.info(f"[RETRIEVER] Took {retrieval_time:.2f} seconds, found {len(docs_with_scores)} docs")
+        docs = vector_store.similarity_search_with_score(question, k=10)
+
         
         
-        for i, (doc, score) in enumerate(docs_with_scores):
+        relevant_docs = []
+        for doc, score in docs:
             similarity = 1.0 - score
-            logger.info(f"  Candidate {i+1}: similarity={similarity:.2f}, content={doc.page_content[:50]}...")
-        
-        
-        best_match = None
-        best_similarity = 0
-        for doc, score in docs_with_scores:
-            similarity = 1.0 - score
-            if similarity > best_similarity:
-                best_match = doc
-                best_similarity = similarity
+            if similarity > 0.6:  # Adjust threshold as needed
+                relevant_docs.append((doc, similarity))
+                logger.info(f"Relevant doc: similarity={similarity:.2f},content={doc.page_content[:50]}...")
 
       
-        if not best_match or best_similarity < 0.5:
-            logger.info(f"[RETRIEVER] No good match found (best similarity: {best_similarity:.2f})")
-            return "I don't have information about that topic in my knowledge base."
-        
-        logger.info(f"[RETRIEVER] Best match similarity: {best_similarity:.2f}")
-        
-        if best_similarity >= 0.85: 
-            logger.info("[RETRIEVER] Using direct answer from knowledge base")
-            return best_match.metadata["answer"]
-        
-        logger.info("[RETRIEVER] Using LLM generation with context")
-        context = best_match.page_content
-        if "answer" in best_match.metadata:
-            context += f"\nAnswer: {best_match.metadata['answer']}"
-  
+        context = ""
+        if relevant_docs:
+            context = "\n".join([f"Content: {doc.page_content}\nAnswer: {doc.metadata.get('answer', '')}" 
+            for doc, similarity in relevant_docs])
+        else:
+            logger.info("[RETRIEVER] No relevant documents found")
+            return "I don't have enough information about that topic in my knowledge base."
+
+        system_prompt = """
+        You are the KU AI Assistant, a helpful information resource for Karachi University.
+        Provide direct, informative answers based on the context provided.
+        Do not introduce yourself as an AI or mention that you're an assistant.
+        If you don't know the answer based on the context, say so.
+        Keep your responses focused on Karachi University information.
+        """
         
         # Generate response
         start_gen = time.time()
-        result = chain.invoke({"context": context, "question": question})
-        generation_time = time.time() - start_gen
-        logger.info(f"[GENERATION] Took {generation_time:.2f} seconds")
-        
+        result = chain.invoke({
+            "context": context,
+            "question": question,
+            "chat_history":chat_history,
+            "system_prompt":system_prompt
             
-        return result
+        })
+        
+        generation_time = time.time() - start_gen
+        
+        logger.info(f"[GENERATION] Took {generation_time:.2f} seconds")
+        reply = result.content if hasattr(result, 'content') else str(result)
+
+        reply = clean_response(reply)   
+        memory.save_context({'input':question},{'output':reply})
+        
+        ChatMessage.objects.create(user=user, role="user", content=question)
+        ChatMessage.objects.create(user=user, role="assistant", content=reply)
+            
+        return reply
         
     except Exception as e:
         logger.info(f"[ERROR] {str(e)}")
         return "I encountered an error processing your request."
+
+
+def clean_response(response):
+    """
+    Remove unwanted AI self-introductions from responses
+    """
+    # Patterns to remove from responses
+    unwanted_patterns = [
+        r"Hello! My name is Anna\. I am an AI assistant.*",
+        r"I am an artificial intelligence assistant.*",
+        r"As an AI.*",
+    ]
+    
+    for pattern in unwanted_patterns:
+        response = re.sub(pattern, "", response).strip()
+    
+    # If the response is empty after cleaning, provide a default response
+    if not response:
+        response = "How can I help you with information about Karachi University?"
+    
+    return response

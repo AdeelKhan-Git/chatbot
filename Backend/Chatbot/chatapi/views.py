@@ -5,14 +5,13 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from .models import KnowledgeBase,UploadRecord
 from .utils import chatbot_response,sync_new_entries_to_vector_store
-from .serializer import LoginSerializer, UserProfileSerializer
-from django.contrib.auth import authenticate
-from rest_framework_simplejwt.tokens import RefreshToken
+
+
 # Create your views here.
 
 
 class ChatBotAPIView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
     def post(self, request):
         prompt = request.data.get('prompt')
 
@@ -22,14 +21,12 @@ class ChatBotAPIView(APIView):
        
 
         try:
-            response = chatbot_response(prompt)
+            response = chatbot_response(request.user,prompt)
             return Response({'response':response},status=status.HTTP_200_OK)
         
         except Exception as e:
             return Response({'error':str(e)},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-    
 
 class UploadFileView(APIView):
     permission_classes = [permissions.IsAdminUser]
@@ -124,42 +121,5 @@ class UploadedDataListView(APIView):
             return Response({"message":[]}, status=status.HTTP_200_OK)
 
         return Response({'message':data}, status=status.HTTP_200_OK)
+     
 
-def generated_token(user):
-    refresh = RefreshToken.for_user(user)      #token for every user 
-
-    return {
-        'refresh': str(refresh),
-        'access' : str(refresh.access_token),
-    }      
-
-class LoginView(APIView):
-    permission_classes = [permissions.AllowAny]
-    def post(self, request):
-        serializer = LoginSerializer(data = request.data)
-        serializer.is_valid(raise_exception=True)
-
-        username = serializer.data.get('username')
-        password = serializer.data.get('password')
-
-        user = authenticate(username=username,password=password)
-
-
-        if user is None:
-            return Response({'message': 'Invalid username or password'}, status=status.HTTP_401_UNAUTHORIZED)
-
-        if not user.is_superuser:
-            return Response({'message':'You are not admin sorry'}, status=status.HTTP_401_UNAUTHORIZED)
-        
-        
-        token=generated_token(user)
-            
-        return Response({'token':token,'user':{'id':user.id,'Username':user.username,'email':user.email}}, status=status.HTTP_200_OK)
-        
-class UserProfileView(APIView):
-    permission_classes = [permissions.IsAuthenticated,permissions.IsAdminUser]
-    def get(self,request):
-        user = request.user
-        serializer = UserProfileSerializer(user)
-
-        return Response({"data": serializer.data},status=status.HTTP_200_OK)

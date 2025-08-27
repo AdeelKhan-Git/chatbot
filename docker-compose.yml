@@ -2,7 +2,10 @@ name: uok_chatbot
 
 services:
     backend:
-      image: kidgamer/ku_chatbot:backend
+      build:
+        context: ./Chatbot
+        dockerfile: Dockerfile
+      command: python -m daphne -b 0.0.0.0 -p 8000 facebook.asgi:application    
 
       volumes:
         - ./Backend/Chatbot:/Chatbot
@@ -20,7 +23,9 @@ services:
         - ollama  
 
     frontend:
-      image: kidgamer/ku_chatbot:frontend
+      build:
+        context: ./front-end
+        dockerfile: Dockerfile
       ports:
         - "8080:8080"
       volumes:
