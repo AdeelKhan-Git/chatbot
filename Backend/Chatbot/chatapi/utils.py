@@ -20,7 +20,7 @@ CHROMA_DB_DIR = "./chroma_langchain_db"
 COLLECTION_NAME = "knowledgebase_qna"
 
 # Initialize models
-llm = OllamaLLM(model="phi", model_kwargs={"num_predict": 150})
+llm = OllamaLLM(model="mistral", model_kwargs={"num_predict": 150})
 
 
 # Initialize Chroma vector store
@@ -35,17 +35,23 @@ vector_store_initialized = False
 vector_store_lock = threading.Lock()
 
 template = """
-You are an expert answering questions based ONLY on the provided context.
-If the answer cannot be found in the context, say "I don't know".
+You are the KU AI Assistant, a helpful information resource for Karachi University.
+Provide direct, informative answers based on the context provided.
+Do not introduce yourself as an AI or mention that you're an assistant.
+If you don't know the answer based on the context, say so.
+Keep your responses focused on Karachi University information.
 
 Context:
 {context}
+
+Chat History:
+{chat_history}
 
 Question: {question}
 Answer:"""
 
 prompt = ChatPromptTemplate.from_template(template)
-chain = prompt | llm
+# chain = prompt | llm
 
 def ensure_database_connection():
     """Ensure database connection is active"""
@@ -108,7 +114,6 @@ def get_user_memory(user):
         return_messages = True
     )
     
-    
     messages = ChatMessage.objects.filter(user=user).order_by('timestemp')
 
     for msg in messages:
@@ -127,47 +132,57 @@ def chatbot_response(user,question):
         initialize_vector_store()
         
         memory = get_user_memory(user)
-        chat_history = memory.load_memory_variables({})['chat_history']
+
+        chain = (
+            {
+                "context": lambda x: get_context(x["question"]),
+                "question": lambda x: x["question"],
+                "chat_history": lambda x: memory.load_memory_variables({})["chat_history"]
+            }
+            | prompt
+            | llm
+        )
+        # chat_history = memory.load_memory_variables({})['chat_history']
 
         
-        docs = vector_store.similarity_search_with_score(question, k=10)
+        # docs = vector_store.similarity_search_with_score(question, k=10)
 
         
         
-        relevant_docs = []
-        for doc, score in docs:
-            similarity = 1.0 - score
-            if similarity > 0.6:  # Adjust threshold as needed
-                relevant_docs.append((doc, similarity))
-                logger.info(f"Relevant doc: similarity={similarity:.2f},content={doc.page_content[:50]}...")
+        # relevant_docs = []
+        # for doc, score in docs:
+        #     similarity = 1.0 - score
+        #     if similarity > 0.6:  # Adjust threshold as needed
+        #         relevant_docs.append((doc, similarity))
+        #         logger.info(f"Relevant doc: similarity={similarity:.2f},content={doc.page_content[:50]}...")
 
       
-        context = ""
-        if relevant_docs:
-            context = "\n".join([f"Content: {doc.page_content}\nAnswer: {doc.metadata.get('answer', '')}" 
-            for doc, similarity in relevant_docs])
-        else:
-            logger.info("[RETRIEVER] No relevant documents found")
-            return "I don't have enough information about that topic in my knowledge base."
+        # context = ""
+        # if relevant_docs:
+        #     context = "\n".join([f"Content: {doc.page_content}\nAnswer: {doc.metadata.get('answer', '')}" 
+        #     for doc, similarity in relevant_docs])
+        # else:
+        #     logger.info("[RETRIEVER] No relevant documents found")
+        #     return "I don't have enough information about that topic in my knowledge base."
 
-        system_prompt = """
-        You are the KU AI Assistant, a helpful information resource for Karachi University.
-        Provide direct, informative answers based on the context provided.
-        Do not introduce yourself as an AI or mention that you're an assistant.
-        If you don't know the answer based on the context, say so.
-        Keep your responses focused on Karachi University information.
-        """
+        # system_prompt = """
+        # You are the KU AI Assistant, a helpful information resource for Karachi University.
+        # Provide direct, informative answers based on the context provided.
+        # Do not introduce yourself as an AI or mention that you're an assistant.
+        # If you don't know the answer based on the context, say so.
+        # Keep your responses focused on Karachi University information.
+        # """
         
         # Generate response
         start_gen = time.time()
-        result = chain.invoke({
-            "context": context,
-            "question": question,
-            "chat_history":chat_history,
-            "system_prompt":system_prompt
+        # result = chain.invoke({
+        #     "context": context,
+        #     "question": question,
+        #     "chat_history":chat_history,
+        #     "system_prompt":system_prompt
             
-        })
-        
+        # })
+        result = chain.invoke({"question": question})
         generation_time = time.time() - start_gen
         
         logger.info(f"[GENERATION] Took {generation_time:.2f} seconds")
@@ -205,3 +220,23 @@ def clean_response(response):
         response = "How can I help you with information about Karachi University?"
     
     return response
+
+def get_context(question):
+    """Retrieve relevant context from vector store"""
+    docs = vector_store.similarity_search_with_score(question, k=10)
+    
+    relevant_docs = []
+    for doc, score in docs:
+        similarity = 1.0 - score
+        if similarity > 0.6:  # Adjust threshold as needed
+            relevant_docs.append((doc, similarity))
+            logger.info(f"Relevant doc: similarity={similarity:.2f}, content={doc.page_content[:50]}...")
+    
+    context = ""
+    if relevant_docs:
+        context = "\n".join([f"Content: {doc.page_content}\nAnswer: {doc.metadata.get('answer', '')}" 
+                             for doc, similarity in relevant_docs])
+    else:
+        logger.info("[RETRIEVER] No relevant documents found")
+    
+    return context

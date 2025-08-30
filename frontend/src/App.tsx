@@ -1,31 +1,46 @@
+import { Suspense, lazy } from "react";
+import { Route, Routes } from "react-router-dom";
+import Loader from "./components/Loader";
+import RoleProtectedRoute from "./components/RoleProtectedRoute";
+import { ROUTES } from "./lib/routes";
 
-import { Toaster } from 'react-hot-toast';
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { GoogleOAuthProvider } from "@react-oauth/google";
-import Index from "./pages/Index";
-import ChatBot from "./pages/ChatBot";
-import AdminPanel from "./pages/AdminPanel";
-import AdminLogin from "./pages/AdminLogin";
-import NotFound from "./pages/NotFound";
-import UserLogin from './pages/UserLogin';
+const Home = lazy(() => import("./pages/Home"));
+const Login = lazy(() => import("./pages/Login"));
+const Chat = lazy(() => import("./pages/Chat"));
+const AdminPanel = lazy(() => import("./pages/AdminPanel"));
 
-const App = () => (
-  <>
-    <Toaster />
-    <GoogleOAuthProvider clientId="292867197714-hqll2rb5nvhdp22l614rjk2fscmab42d.apps.googleusercontent.com">
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/chat" element={<ChatBot />} />
-          <Route path="/admin-login" element={<AdminLogin />} />
-          <Route path="/user-login" element={<UserLogin />} />
-          <Route path="/admin" element={<AdminPanel />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </GoogleOAuthProvider>
-  </>
-);
+function App() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen min-w-screen flex items-center justify-center">
+          <Loader />
+        </div>
+      }
+    >
+      <Routes>
+        <Route path={ROUTES.HOME} element={<Home />} />
+        <Route path={ROUTES.LOGIN} element={<Login />} />
+        <Route
+          path={ROUTES.CHAT}
+          element={
+            <RoleProtectedRoute allowedRoles={["student", "admin"]}>
+              <Chat />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route
+          path={ROUTES.ADMIN}
+          element={
+            <RoleProtectedRoute allowedRoles={["admin"]}>
+              <AdminPanel />
+            </RoleProtectedRoute>
+          }
+        />
+        <Route path="*" element={<Home />} />
+      </Routes>
+    </Suspense>
+  );
+}
 
 export default App;

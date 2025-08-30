@@ -23,7 +23,7 @@ class GoogleLoginView(APIView):
 
         try:
             id_info = id_token.verify_oauth2_token(
-                google_token, requests.Request(), os.getenv('GOOGLE_CLIENT_ID')
+                google_token, requests.Request(), os.getenv('VITE_GOOGLE_CLIENT_ID')
             )
 
             email = id_info.get('email')
@@ -43,7 +43,7 @@ class GoogleLoginView(APIView):
 
         token = User.generated_token(user)
        
-        return Response({"token":token, "user":{"id":user.id,"username":user.username,"email":user.email},"new_user":created},status=status.HTTP_201_CREATED)
+        return Response({"token":token, "user":{"id":user.id,"username":user.username,"email":user.email,'role':'student'},"new_user":created},status=status.HTTP_201_CREATED)
 
 
 
@@ -68,7 +68,7 @@ class LoginView(APIView):
         
         token=User.generated_token(user)
         
-        return Response({'token':token,'user':{'id':user.id,'Username':user.username,'email':user.email}}, status=status.HTTP_200_OK)
+        return Response({'token':token,'user':{'id':user.id,'Username':user.username,'email':user.email,'role':'admin'}}, status=status.HTTP_200_OK)
         
 class UserProfileView(APIView):
     permission_classes = [permissions.IsAuthenticated,permissions.IsAdminUser]

@@ -3,7 +3,7 @@ name: uok_chatbot
 services:
     backend:
       build:
-        context: ./Chatbot
+        context: ./Backend/Chatbot
         dockerfile: Dockerfile
       command: python -m daphne -b 0.0.0.0 -p 8000 facebook.asgi:application    
 
@@ -24,7 +24,7 @@ services:
 
     frontend:
       build:
-        context: ./front-end
+        context: ./frontend
         dockerfile: Dockerfile
       ports:
         - "8080:8080"
@@ -44,7 +44,7 @@ services:
         ollama serve &
         sleep 5 &&
         ollama list | grep nomic-embed-text || ollama pull nomic-embed-text &&
-        ollama list | grep phi || ollama pull phi &&
+        ollama list | grep mistral || ollama pull mistral &&
   
         wait
         "

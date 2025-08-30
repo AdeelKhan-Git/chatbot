@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount.providers.google',
     'rest_framework',
     'rest_framework_simplejwt',
+    'drf_yasg',
 ]
 
 MIDDLEWARE = [
@@ -171,6 +172,7 @@ SIMPLE_JWT = {
 
 CORS_ALLOWED_ORIGINS = [
    "http://localhost:8080",
+   "http://localhost:5173",
 ]
 
 LOGGING = {
