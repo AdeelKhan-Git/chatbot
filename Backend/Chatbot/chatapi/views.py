@@ -5,6 +5,7 @@ from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from .models import KnowledgeBase,UploadRecord
 from .utils import chatbot_response,sync_new_entries_to_vector_store
+from django.http import StreamingHttpResponse
 
 
 # Create your views here.
@@ -19,13 +20,12 @@ class ChatBotAPIView(APIView):
             return Response({'error':'prompt is required'},status=status.HTTP_400_BAD_REQUEST)
         
        
-
-        try:
-            response = chatbot_response(request.user,prompt)
-            return Response({'response':response},status=status.HTTP_200_OK)
         
-        except Exception as e:
-            return Response({'error':str(e)},status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        def event_stream():
+            for token in chatbot_response(request.user, prompt):
+                yield f"data: {token}\n\n"
+            
+        return StreamingHttpResponse(event_stream(),content_type = "text/event-stream")
 
 
 class UploadFileView(APIView):

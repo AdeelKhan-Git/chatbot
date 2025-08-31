@@ -20,7 +20,7 @@ CHROMA_DB_DIR = "./chroma_langchain_db"
 COLLECTION_NAME = "knowledgebase_qna"
 
 # Initialize models
-llm = OllamaLLM(model="mistral", model_kwargs={"num_predict": 150})
+llm = OllamaLLM(model="mistral-q4_k_m", model_kwargs={"num_predict": 150},keep_alive="-1")
 
 
 # Initialize Chroma vector store
@@ -142,59 +142,37 @@ def chatbot_response(user,question):
             | prompt
             | llm
         )
-        # chat_history = memory.load_memory_variables({})['chat_history']
+        full_reply = ""
 
-        
-        # docs = vector_store.similarity_search_with_score(question, k=10)
 
-        
-        
-        # relevant_docs = []
-        # for doc, score in docs:
-        #     similarity = 1.0 - score
-        #     if similarity > 0.6:  # Adjust threshold as needed
-        #         relevant_docs.append((doc, similarity))
-        #         logger.info(f"Relevant doc: similarity={similarity:.2f},content={doc.page_content[:50]}...")
-
-      
-        # context = ""
-        # if relevant_docs:
-        #     context = "\n".join([f"Content: {doc.page_content}\nAnswer: {doc.metadata.get('answer', '')}" 
-        #     for doc, similarity in relevant_docs])
-        # else:
-        #     logger.info("[RETRIEVER] No relevant documents found")
-        #     return "I don't have enough information about that topic in my knowledge base."
-
-        # system_prompt = """
-        # You are the KU AI Assistant, a helpful information resource for Karachi University.
-        # Provide direct, informative answers based on the context provided.
-        # Do not introduce yourself as an AI or mention that you're an assistant.
-        # If you don't know the answer based on the context, say so.
-        # Keep your responses focused on Karachi University information.
-        # """
         
         # Generate response
         start_gen = time.time()
-        # result = chain.invoke({
-        #     "context": context,
-        #     "question": question,
-        #     "chat_history":chat_history,
-        #     "system_prompt":system_prompt
-            
-        # })
-        result = chain.invoke({"question": question})
+
+        try:
+            for chunk in chain.stream({"question":question}):
+                token = chunk.content if hasattr(chunk, "content") else str(chunk)
+
+                full_reply += token
+
+                yield token
+        except Exception as e:
+            logger.error(f"[STREAM ERROR] {str(e)}")
+            yield "I encountered an error processing your request."
+            return
+        
+        # result = chain.invoke({"question": question})
         generation_time = time.time() - start_gen
         
         logger.info(f"[GENERATION] Took {generation_time:.2f} seconds")
-        reply = result.content if hasattr(result, 'content') else str(result)
+        # reply = result.content if hasattr(result, 'content') else str(result)
 
-        reply = clean_response(reply)   
-        memory.save_context({'input':question},{'output':reply})
+        final_reply = clean_response(full_reply)   
+        memory.save_context({'input':question},{'output':final_reply})
         
         ChatMessage.objects.create(user=user, role="user", content=question)
-        ChatMessage.objects.create(user=user, role="assistant", content=reply)
+        ChatMessage.objects.create(user=user, role="assistant", content=final_reply)
             
-        return reply
         
     except Exception as e:
         logger.info(f"[ERROR] {str(e)}")

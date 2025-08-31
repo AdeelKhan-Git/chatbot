@@ -5,7 +5,7 @@ services:
       build:
         context: ./Backend/Chatbot
         dockerfile: Dockerfile
-      command: python -m daphne -b 0.0.0.0 -p 8000 facebook.asgi:application    
+      command: python manage.py runserver 0.0.0.0:8000  
 
       volumes:
         - ./Backend/Chatbot:/Chatbot
@@ -44,7 +44,7 @@ services:
         ollama serve &
         sleep 5 &&
         ollama list | grep nomic-embed-text || ollama pull nomic-embed-text &&
-        ollama list | grep mistral || ollama pull mistral &&
+        ollama list | grep 'mistral:Q4_K_M' || ollama pull mistral:Q4_K_M &&
   
         wait
         "
